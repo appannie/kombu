@@ -184,9 +184,7 @@ class Channel(virtual.Channel):
         # exists with a different visibility_timeout, so this prepopulates
         # the queue_cache to protect us from recreating
         # queues that are known to already exist.
-        queues = self.sqs.get_all_queues(prefix=self.queue_name_prefix)
-        for queue in queues:
-            self._queue_cache[queue.name] = queue
+        self._update_queue_cache(self.queue_name_prefix)
         self._fanout_queues = set()
 
         # The drain_events() method stores extra messages in a local
@@ -194,6 +192,20 @@ class Channel(virtual.Channel):
         # SQS at once for performance, but maintains the same external API
         # to the caller of the drain_events() method.
         self._queue_message_cache = collections.deque()
+
+    def _update_queue_cache(self, queue_name_prefix):
+        try:
+            queues = self.sqs.get_all_queues(prefix=queue_name_prefix)
+        except exception.SQSError as exc:
+            if exc.status == 403:
+                raise RuntimeError(
+                    'SQS authorization error, access_key={0}'.format(
+                        self.sqs.access_key))
+            raise
+        else:
+            self._queue_cache.update({
+                queue.name: queue for queue in queues
+            })
 
     def basic_consume(self, queue, no_ack, *args, **kwargs):
         if no_ack:
@@ -258,6 +270,8 @@ class Channel(virtual.Channel):
         # Translate to SQS name for consistency with initial
         # _queue_cache population.
         queue = self.entity_name(self.queue_name_prefix + queue)
+        if queue not in self._queue_cache:
+            self._update_queue_cache(queue)
         try:
             return self._queue_cache[queue]
         except KeyError:

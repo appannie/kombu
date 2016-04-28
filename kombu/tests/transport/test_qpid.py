@@ -1301,10 +1301,10 @@ class TestChannel(ExtraAssertionsMixin, Case):
         self.my_channel.basic_publish(
             mock_message, mock_exchange, mock_routing_key,
         )
-        mock_encode_body.assert_called_once(
+        mock_encode_body.assert_called_once_with(
             mock_original_body, mock_body_encoding,
         )
-        mock_buffer.assert_called_once(mock_encode_body)
+        mock_buffer.assert_called_once_with(mock_encoded_body)
         self.assertIs(mock_message['body'], mock_encoded_buffered_body)
         self.assertIs(
             mock_message['properties']['body_encoding'], mock_body_encoding,
@@ -1557,8 +1557,9 @@ class TestTransportInit(Case):
         self.mock_verify_runtime_environment.assert_called_once_with()
 
     def test_transport___init___calls_parent_class___init__(self):
-        Transport(Mock())
-        self.mock_base_Transport__init__.assert_caled_once_with()
+        m = Mock()
+        Transport(m)
+        self.mock_base_Transport__init__.assert_called_once_with(m)
 
     def test_transport___init___calls_os_pipe(self):
         Transport(Mock())
